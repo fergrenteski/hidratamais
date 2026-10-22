@@ -1,0 +1,10 @@
+services:
+  app:
+    build: .
+    image: hidratamais:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - path: .env
+        required: false
+    restart: unless-stopped

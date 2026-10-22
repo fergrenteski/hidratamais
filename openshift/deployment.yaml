@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hidratamais
+  labels:
+    app: hidratamais
+    app.kubernetes.io/name: hidratamais
+    app.kubernetes.io/part-of: hidratamais
+    app.openshift.io/runtime: nodejs
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: hidratamais
+  template:
+    metadata:
+      labels:
+        app: hidratamais
+    spec:
+      # Sem securityContext com UID fixo: o OpenShift atribui um UID aleatório (SCC restricted).
+      containers:
+        - name: hidratamais
+          image: docker.io/SEU_USUARIO/hidratamais:1.0.0
+          imagePullPolicy: Always
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: PORT
+              value: "8080"
+          envFrom:
+            - secretRef:
+                name: hidratamais-secrets
+          readinessProbe:
+            httpGet:
+              path: /api/health
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          livenessProbe:
+            # ?probe=liveness não consulta o Cosmos: banco fora do ar não reinicia o pod em loop.
+            httpGet:
+              path: /api/health?probe=liveness
+              port: http
+            initialDelaySeconds: 15
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi

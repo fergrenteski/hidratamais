@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: hidratamais
+  labels:
+    app: hidratamais
+spec:
+  selector:
+    app: hidratamais
+  ports:
+    - name: http
+      port: 8080
+      targetPort: http
+      protocol: TCP

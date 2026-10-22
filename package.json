@@ -1,0 +1,10 @@
+{
+  "name": "hidratamais",
+  "private": true,
+  "scripts": {
+    "setup": "npm ci --prefix server && npm ci --prefix client",
+    "dev": "npm run dev --prefix server & npm run dev --prefix client",
+    "test": "npm test --prefix server",
+    "build": "npm run build --prefix client"
+  }
+}

@@ -1,0 +1,16 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: hidratamais
+  labels:
+    app: hidratamais
+spec:
+  # Sem "host": o OpenShift gera https://hidratamais-<namespace>.apps.sandbox....
+  to:
+    kind: Service
+    name: hidratamais
+  port:
+    targetPort: http
+  tls:
+    termination: edge
+    insecureEdgeTerminationPolicy: Redirect
