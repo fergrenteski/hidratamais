@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { getRepository } from '../repositories/index.js';
-import { AppError, notFound } from './errors.js';
+import { AppError } from './errors.js';
 
 export const DEFAULT_TIMEZONE = 'America/Sao_Paulo';
 
@@ -33,7 +33,8 @@ export async function createUser({ name, timezone }) {
 
 export async function getUser(userId) {
   const user = await getRepository().getUser(userId);
-  if (!user) throw notFound('Usuário');
+  // Código próprio: o front usa para limpar um perfil salvo que não existe mais no banco.
+  if (!user) throw new AppError(404, 'USER_NOT_FOUND', 'Usuário não encontrado');
   return user;
 }
 

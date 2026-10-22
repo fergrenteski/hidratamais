@@ -1,6 +1,6 @@
 import { createContext, lazy, Suspense, useCallback, useContext, useEffect, useState } from 'react';
 import { NavLink, Navigate, Outlet, Route, Routes } from 'react-router';
-import { api, ApiError, type User } from './api';
+import { api, ApiError, USER_MISSING, type User } from './api';
 import { storage } from './util';
 import { Welcome } from './pages/Welcome';
 import { TodayPage } from './pages/Today';
@@ -39,6 +39,15 @@ export function App() {
   }, []);
 
   useEffect(load, [load]);
+
+  useEffect(() => {
+    const onMissing = () => {
+      storage.set(KEY, null);
+      setUserState(null);
+    };
+    window.addEventListener(USER_MISSING, onMissing);
+    return () => window.removeEventListener(USER_MISSING, onMissing);
+  }, []);
 
   const setUser = (u: User) => {
     storage.set(KEY, u.id);

@@ -46,6 +46,9 @@ export class ApiError extends Error {
   }
 }
 
+// Disparado quando o perfil salvo no navegador não existe mais no banco (trocou de DB, foi excluído...).
+export const USER_MISSING = 'hm:user-missing';
+
 // Vazio = mesma origem (imagem única). Defina VITE_API_URL só se hospedar o front separado.
 const BASE = (import.meta.env.VITE_API_URL ?? '') + '/api';
 
@@ -58,7 +61,12 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
   }
   if (res.status === 204) return undefined as T;
   const body = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, body?.error?.code ?? 'HTTP', body?.error?.message ?? `Erro ${res.status}`);
+  if (!res.ok) {
+    // Sem JSON = a resposta não veio da nossa API (ex.: proxy do Vite com o backend ainda subindo).
+    if (!body?.error) throw new ApiError(res.status, 'UNAVAILABLE', 'O servidor não respondeu. Se ele acabou de iniciar, aguarde alguns segundos e tente de novo.');
+    if (body.error.code === 'USER_NOT_FOUND') window.dispatchEvent(new Event(USER_MISSING));
+    throw new ApiError(res.status, body.error.code, body.error.message);
+  }
   return body as T;
 }
 

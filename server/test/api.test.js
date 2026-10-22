@@ -45,7 +45,9 @@ describe('API', () => {
     expect((await request(app).get(`${base}/stats/summary`)).body.badges[0].earned).toBe(true);
 
     await request(app).delete(base).expect(204);
-    expect((await request(app).get(base)).status).toBe(404);
+    const gone = await request(app).get(`${base}/stats/today`);
+    expect(gone.status).toBe(404);
+    expect(gone.body.error.code).toBe('USER_NOT_FOUND');
   });
 
   it('valida entradas e responde no formato de erro padrão', async () => {
