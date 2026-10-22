@@ -19,6 +19,8 @@ npm run setup
 npm run dev
 ```
 
+> **No Windows (PowerShell):** troque `cp` por `Copy-Item .env.example .env`. O `npm run dev` da raiz não funciona no Windows, então abra dois terminais na pasta do projeto e rode `npm run dev --prefix server` em um e `npm run dev --prefix client` no outro. Também dá para pular tudo isso e usar o Docker Desktop (abaixo).
+
 Abra **http://localhost:5173**. O Vite encaminha `/api` para o backend em `:8080`. Por padrão o `.env` usa `DB_DRIVER=memory`, então você testa tudo sem Azure (os dados somem ao reiniciar).
 
 Com Docker, já como a imagem de produção:
@@ -180,6 +182,13 @@ docker push SEU_USUARIO/hidratamais:latest
 
 A imagem fica pública por padrão em repositórios gratuitos: **https://hub.docker.com/r/SEU_USUARIO/hidratamais**.
 
+> **No Windows:**
+> 1. Instale o **Docker Desktop** (https://www.docker.com/products/docker-desktop) e deixe-o aberto.
+> 2. Baixe o projeto: no GitHub, **Code → Download ZIP**, e extraia (ou use `git clone`).
+> 3. Na pasta extraída, clique com o botão direito → **Abrir no Terminal** (PowerShell). Os comandos `docker` acima funcionam iguais.
+> 4. Para criar o `.env` no PowerShell, use `Copy-Item .env.example .env` no lugar de `cp`.
+> 5. Depois do `docker build`/`docker tag`, também dá para enviar pela interface: no Docker Desktop, abra **Images**, clique nos três pontinhos da imagem `SEU_USUARIO/hidratamais` → **Push to Hub**.
+
 Testes antes de publicar, incluindo um UID arbitrário como no OpenShift:
 
 ```bash
@@ -265,10 +274,112 @@ Com `--min-replicas 0`, a primeira requisição depois de um tempo parado demora
 
 ### 4. Red Hat OpenShift (Developer Sandbox, gratuito)
 
-#### Pré-requisitos
+Há duas formas de publicar, com o mesmo resultado:
+
+- **4.1 Pelo console web:** tudo no navegador, sem instalar nada. É o caminho recomendado no Windows e para quem quer aprender pela interface.
+- **4.2 Pela linha de comando `oc`:** mais rápido para quem já usa terminal.
+
+Antes de qualquer uma delas, você precisa de duas coisas: a imagem publicada no Docker Hub (seção 1) e a **URI** e a **PRIMARY KEY** do Cosmos (seção "Azure Cosmos DB com free tier").
+
+#### 4.1 Pelo console web (sem terminal, ideal no Windows)
+
+> Os nomes dos menus podem mudar um pouco entre versões do console. Nas versões mais novas, as perspectivas *Administrator* e *Developer* foram unificadas e tudo fica no menu lateral. Nas mais antigas, há um seletor de perspectiva no topo do menu lateral. Os passos 1 a 7 usam menus que existem nos dois casos.
+
+**Passo 1: Criar a conta e abrir o console**
+
+1. Acesse **https://console.redhat.com/openshift/sandbox** e entre com sua conta Red Hat (gratuita). Se não tiver conta, crie uma. Pode ser pedida uma verificação por SMS.
+2. No card **Red Hat OpenShift**, clique em **Launch**. O console web abre em outra aba.
+3. No topo da página, no seletor **Project**, confira que o projeto escolhido é o seu (algo como `seunome-dev`). Todos os passos seguintes acontecem dentro dele.
+
+**Passo 2: Guardar as credenciais do Cosmos em um Secret**
+
+1. No menu lateral, abra **Workloads → Secrets**.
+2. Clique em **Create → Key/value secret**.
+3. Em **Secret name**, digite `hidratamais-secrets`, exatamente assim, porque o Deployment procura esse nome.
+4. Preencha um par chave/valor por linha, usando **Add key/value** para criar novas linhas:
+
+   | Key | Value |
+   |---|---|
+   | `DB_DRIVER` | `cosmos` |
+   | `COSMOS_ENDPOINT` | a URI do Cosmos (ex.: `https://hidratamais-seunome.documents.azure.com:443/`) |
+   | `COSMOS_KEY` | a PRIMARY KEY do Cosmos |
+   | `COSMOS_DATABASE` | `hidratamais` |
+
+5. Clique em **Create**.
+
+Cole os valores sem espaços nem quebra de linha no final. `CORS_ORIGIN` não é necessário, porque o site e a API rodam juntos.
+
+**Passo 3: Criar o Deployment (o app rodando)**
+
+1. No navegador, abra **https://github.com/fergrenteski/hidratamais/blob/main/openshift/deployment.yaml** e clique no ícone **Copy raw file**, os dois quadradinhos no canto superior direito do arquivo.
+2. No console do OpenShift, clique no ícone **+** da barra superior (*Quick create*, ao lado do seu nome) → **Import YAML**.
+3. Cole o conteúdo. Na linha `image: docker.io/SEU_USUARIO/hidratamais:1.0.0`, troque `SEU_USUARIO` pelo seu usuário do Docker Hub.
+4. Clique em **Create**. Abre a tela de detalhes do Deployment `hidratamais`.
+
+O arquivo já define a porta 8080, as variáveis vindas do Secret, os health checks (`/api/health`) e os limites de CPU e memória que cabem na cota do Sandbox.
+
+**Passo 4: Criar o Service (endereço interno)**
+
+Repita o passo 3 com **https://github.com/fergrenteski/hidratamais/blob/main/openshift/service.yaml**. Não há nada para editar: copie, cole em **+ → Import YAML** e clique em **Create**.
+
+**Passo 5: Criar a Route (URL pública com HTTPS)**
+
+Repita o passo 3 com **https://github.com/fergrenteski/hidratamais/blob/main/openshift/route.yaml**. Também não há nada para editar. A Route usa HTTPS e redireciona automaticamente quem acessar por HTTP.
+
+> Não importe o `secret.example.yaml`. Ele tem valores fictícios e sobrescreveria o Secret criado no passo 2.
+
+**Passo 6: Abrir o site**
+
+1. No menu lateral, abra **Networking → Routes**.
+2. Na linha `hidratamais`, a coluna **Location** mostra a URL pública, algo como `https://hidratamais-seunome-dev.apps.sandbox-....openshiftapps.com`. Clique nela.
+3. Teste também `<sua URL>/api/health`. A resposta esperada é `{"status":"ok","db":"cosmos",...}`.
+
+**Passo 7: Conferir se está tudo saudável**
+
+- **Workloads → Pods:** o pod `hidratamais-xxxxx` deve aparecer como **Running** com **Ready 1/1**. A primeira subida leva cerca de 1 minuto, porque a imagem é baixada do Docker Hub.
+- Clique no pod e abra a aba **Logs**. Deve aparecer `HidrataMais ouvindo na porta 8080 (db: cosmos)`.
+- A aba **Events** do pod mostra problemas de download da imagem ou de health check.
+- **Topology:** fica no menu lateral (ou em **Workloads → Topology**; nas versões antigas, na perspectiva **Developer**). O círculo do app fica com a borda **azul escuro** quando está rodando.
+
+Problemas comuns:
+
+| O que aparece | Causa provável | Como resolver |
+|---|---|---|
+| `ImagePullBackOff` ou `ErrImagePull` | Nome da imagem errado, repositório privado no Docker Hub ou imagem gerada só para `arm64` | Confira a linha `image:` em **Workloads → Deployments → hidratamais → aba YAML**. Deixe o repositório público no Docker Hub. Refaça o build com `--platform linux/amd64` |
+| `CreateContainerConfigError` | O Secret não existe ou tem outro nome | Crie o Secret do passo 2 com o nome exato `hidratamais-secrets` |
+| `CrashLoopBackOff` e log "Falha ao inicializar o banco" | URI ou chave do Cosmos errada | **Workloads → Secrets → hidratamais-secrets → Actions → Edit Secret**, corrija e reinicie (veja abaixo) |
+| Pod **Running**, mas **0/1 Ready** | `/api/health` devolve 503 porque o Cosmos não responde | Veja a aba **Logs**. No Portal Azure, confira se a rede do Cosmos está em **Todas as redes** |
+
+**Atualizar para uma nova versão da imagem**
+
+- **Mesma tag** (você reenviou `1.0.0` ao Docker Hub): **Workloads → Deployments → hidratamais → Actions → Restart rollout**.
+- **Tag nova** (ex.: `1.0.1`): **Workloads → Deployments → hidratamais → aba YAML**, altere a linha `image:` e clique em **Save**. O OpenShift troca o pod sozinho.
+
+**Acordar o app antes dos prints**
+
+O Sandbox hiberna os apps parados, deixando 0 pods. Para acordar, abra **Workloads → Deployments → hidratamais**. Na aba **Details**, clique na **seta para cima** ao lado do círculo de pods até aparecer 1 pod. Espere o círculo ficar azul (Running) e abra a URL do site uma vez.
+
+**Alternativa: criar o app só com formulários (sem colar YAML)**
+
+Se o seu console tiver a página **+Add** (em versões antigas, ela fica na perspectiva **Developer**), dá para criar tudo preenchendo formulários. Antes, faça o passo 2 (Secret).
+
+1. **+Add → Container images**.
+2. Marque **Image name from external registry** e digite `docker.io/SEU_USUARIO/hidratamais:1.0.0`.
+3. Em **Application**, escolha **Create application** com o nome `hidratamais-app`. Em **Name**, use `hidratamais`. Em **Resource type**, escolha **Deployment**.
+4. Em **Target port**, coloque `8080` e deixe marcado **Create a route**. Em **Show advanced Routing options**, marque **Secure Route**, escolha **TLS termination: Edge** e **Insecure traffic: Redirect**.
+5. No rodapé do formulário, use os links de opções avançadas:
+   - **Health checks:** adicione um **Readiness probe** do tipo HTTP GET no caminho `/api/health`, porta `8080`, e um **Liveness probe** no caminho `/api/health?probe=liveness`, porta `8080`.
+   - **Resource limits:** CPU request `50` millicores e limit `250` millicores. Memória request `128` Mi e limit `256` Mi.
+6. Clique em **Create**.
+7. Ligue o Secret ao app: **Workloads → Deployments → hidratamais → aba Environment** → em **All values from existing ConfigMaps or Secrets**, clique em **Add all from ConfigMap or Secret**, escolha `hidratamais-secrets` e clique em **Save**.
+8. Siga a partir do passo 6 (abrir o site).
+
+#### 4.2 Pela linha de comando (`oc`)
+
+##### Pré-requisitos
 
 1. Crie a conta gratuita em **https://console.redhat.com/openshift/sandbox** e clique em **Launch** no card do Red Hat OpenShift. Você recebe um projeto pronto (algo como `seunome-dev`).
-2. Instale a CLI `oc`. No console web, clique em **?** → **Command Line Tools** e baixe para o seu sistema. No Mac também dá para usar:
+2. Instale a CLI `oc`. No console web, clique em **?** → **Command Line Tools** e baixe para o seu sistema (no Windows, extraia o `oc.exe` e coloque numa pasta do PATH). No Mac também dá para usar:
 
    ```bash
    brew install openshift-cli
@@ -281,7 +392,7 @@ Com `--min-replicas 0`, a primeira requisição depois de um tempo parado demora
    oc project
    ```
 
-#### Opção A: manifestos prontos (`openshift/`)
+##### Opção A: manifestos prontos (`openshift/`)
 
 1. Crie o Secret a partir do seu `.env`, que precisa ter `DB_DRIVER=cosmos` e as credenciais:
 
@@ -306,7 +417,7 @@ Com `--min-replicas 0`, a primeira requisição depois de um tempo parado demora
 
 O Deployment usa `containerPort: 8080`, variáveis via `envFrom` do Secret, readiness em `/api/health`, liveness em `/api/health?probe=liveness` e recursos de 50m CPU/128Mi (requests) e 250m CPU/256Mi (limits). Não há `securityContext` com UID fixo: o OpenShift atribui um UID aleatório, e a imagem já está preparada para isso.
 
-#### Opção B: caminho rápido só com `oc`
+##### Opção B: caminho rápido só com `oc`
 
 ```bash
 oc new-app --image=docker.io/SEU_USUARIO/hidratamais:1.0.0 --name=hidratamais
@@ -340,7 +451,7 @@ Ou só HTTP:
 oc expose service/hidratamais
 ```
 
-#### Verificação e troubleshooting
+##### Verificação e troubleshooting
 
 ```bash
 oc get pods
@@ -378,7 +489,7 @@ oc set image deployment/hidratamais hidratamais=docker.io/SEU_USUARIO/hidratamai
 oc rollout status deploy/hidratamais
 ```
 
-#### Lembretes do Sandbox
+#### 4.3 Lembretes do Sandbox (vale para as duas formas)
 
 - A cota do namespace é pequena. Mantenha 1 réplica e os recursos modestos do manifesto.
 - Os pods são **hibernados** (escalados a zero) depois de algumas horas, e a conta expira após um período (é possível renovar). Antes de tirar os prints, **acorde o app**:
