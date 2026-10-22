@@ -1,0 +1,4 @@
+# Sempre LF, também no Windows: evita \r em .env, YAML e Dockerfile.
+* text=auto eol=lf
+*.png binary
+*.woff2 binary

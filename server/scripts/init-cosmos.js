@@ -1,7 +1,8 @@
 // Cria banco e containers no Cosmos DB se não existirem.
 // Usado no boot do backend e também executável direto: `npm run init:cosmos`.
 import { CosmosClient } from '@azure/cosmos';
-import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 
 export async function initCosmos({ endpoint, key, database }) {
   if (!endpoint || !key) throw new Error('COSMOS_ENDPOINT e COSMOS_KEY são obrigatórios para DB_DRIVER=cosmos');
@@ -20,7 +21,8 @@ export async function initCosmos({ endpoint, key, database }) {
   return { client, db, users, intakes };
 }
 
-if (import.meta.url === pathToFileURL(process.argv[1]).href) {
+// Executado direto? (comparação sem caixa: no Windows o drive pode vir como c: ou C:)
+if (process.argv[1] && path.resolve(process.argv[1]).toLowerCase() === fileURLToPath(import.meta.url).toLowerCase()) {
   const { config } = await import('../src/config/env.js');
   await initCosmos(config.cosmos);
   console.log(`Cosmos pronto: banco "${config.cosmos.database}" com containers users e intakes.`);

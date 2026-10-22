@@ -1,9 +1,12 @@
 {
   "name": "hidratamais",
   "private": true,
+  "engines": {
+    "node": ">=22.12"
+  },
   "scripts": {
-    "setup": "npm ci --prefix server && npm ci --prefix client",
-    "dev": "npm run dev --prefix server & npm run dev --prefix client",
+    "setup": "npm ci --engine-strict --prefix server && npm ci --engine-strict --prefix client",
+    "dev": "node scripts/dev.mjs",
     "test": "npm test --prefix server",
     "build": "npm run build --prefix client"
   }

@@ -3,7 +3,7 @@
 Controle de consumo de água: defina uma meta diária, registre cada copo com um toque e veja uma **proveta graduada** encher ao longo do dia. Cada marca da proveta é uma dose, com o volume em ml de um lado e o horário sugerido do outro. Sem login: o usuário informa só o nome.
 
 - **Frontend:** React 19 + Vite + TypeScript, React Router, Recharts
-- **Backend:** Node.js 20+ com Express 5, Zod, helmet, CORS, morgan, express-rate-limit
+- **Backend:** Node.js 22+ com Express 5, Zod, helmet, CORS, morgan, express-rate-limit
 - **Banco:** Azure Cosmos DB for NoSQL (free tier), com o driver em memória (`DB_DRIVER=memory`) como alternativa
 - **Deploy:** imagem Docker única (front + API na porta 8080), pronta para Docker Hub, Azure Web App, Azure Container Apps e Red Hat OpenShift
 
@@ -11,7 +11,7 @@ Controle de consumo de água: defina uma meta diária, registre cada copo com um
 
 ## Rodar localmente
 
-Requisitos: Node.js 20.12+ (ou só Docker).
+Requisitos: **Node.js 22.12 ou mais novo** (o LTS atual em https://nodejs.org), ou só o Docker.
 
 ```bash
 cp .env.example .env
@@ -19,7 +19,7 @@ npm run setup
 npm run dev
 ```
 
-> **No Windows (PowerShell):** troque `cp` por `Copy-Item .env.example .env`. O `npm run dev` da raiz não funciona no Windows, então abra dois terminais na pasta do projeto e rode `npm run dev --prefix server` em um e `npm run dev --prefix client` no outro. Também dá para pular tudo isso e usar o Docker Desktop (abaixo).
+> **No Windows:** os mesmos comandos funcionam no PowerShell ou no Prompt de Comando. Só troque `cp` por `copy .env.example .env`. Se algo der errado, veja [Problemas comuns no Windows](#problemas-comuns-no-windows).
 
 Abra **http://localhost:5173**. O Vite encaminha `/api` para o backend em `:8080`. Por padrão o `.env` usa `DB_DRIVER=memory`, então você testa tudo sem Azure (os dados somem ao reiniciar).
 
@@ -37,6 +37,21 @@ Testes do backend (lógica de streak, % da meta, próxima dose e fluxo da API):
 ```bash
 npm test
 ```
+
+### Problemas comuns no Windows
+
+| Sintoma | Causa | Solução |
+|---|---|---|
+| `npm.ps1 não pode ser carregado porque a execução de scripts foi desabilitada` | A política do PowerShell bloqueia o `npm` | Use o **Prompt de Comando** (cmd) no lugar do PowerShell, ou rode uma vez no PowerShell `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` |
+| `npm` ou `node` "não é reconhecido como um comando" | Node não instalado, ou o terminal foi aberto antes da instalação | Instale o Node 22 LTS em https://nodejs.org e **abra um terminal novo** |
+| `EBADENGINE`, `Unsupported engine` ou `Node ... é antigo demais` | Node mais antigo que 22.12 | Veja a versão com `node -v` e instale o Node 22 LTS |
+| `Cannot find module @rolldown/binding-win32-x64-msvc` | `node_modules` copiado de outro PC (Mac/Linux) | Apague as pastas `client\node_modules` e `server\node_modules` e rode `npm run setup` de novo |
+| `EADDRINUSE: address already in use :::8080` | Outro programa usa a porta 8080 | Feche o outro programa, ou mude `PORT=8081` no `.env` e no `client/vite.config.ts` (linha do proxy) |
+| A página em `localhost:5173` não abre | O terminal com `npm run dev` foi fechado ou mostrou erro | Rode `npm run dev` de novo e leia a primeira mensagem de erro |
+| `localhost:8080` mostra `Cannot GET /` | Em desenvolvimento a porta 8080 é só a API | Abra **http://localhost:5173** (ou use o Docker, que serve tudo na 8080) |
+| `.env` ignorado ou valores com caracteres estranhos | Arquivo salvo como `.env.txt` pelo Bloco de Notas | No Explorer, ative **Exibir → Extensões de nomes de arquivos** e renomeie para `.env` |
+
+Já tinha clonado o projeto antes? Atualize com `git pull` e rode `npm run setup` de novo: as versões antigas do `npm run dev` não funcionavam no Windows.
 
 ---
 
